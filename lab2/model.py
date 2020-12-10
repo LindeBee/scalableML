@@ -1,10 +1,12 @@
 import tensorflow as tf
+from keras.applications.inception_v3 import InceptionV3
 
 #%%
 
 # Encoder Model = Pretrained VGG16 CNN model
 
-cnn_model = tf.keras.applications.inception_v3.InceptionV3
+cnn_model = InceptionV3()
+
 
 #%%
 
@@ -37,3 +39,4 @@ final_model = tf.keras.layers.Dense(vocab_size, activation='softmax')(final_mode
 # Creating the model
 rnn_model = tf.keras.models.Model(inputs=[image_input, caption_input], outputs=final_model)
 rnn_model.compile(loss='categorical_crossentropy', optimizer='adam')
+#%%
