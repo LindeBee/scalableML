@@ -134,7 +134,7 @@ def encode_images(images, length=None):
 """
 #%%
 
-images_enc = np.load('lab2/images_encoded.npy')
+images_enc = np.load('lab2/image_enc.npy')
 print(len(images_enc))
 print(images_enc[0])
 
