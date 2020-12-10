@@ -1,1 +1,8 @@
 /lab2/dataF8k/
+/venv/
+/venv2/
+lab2/.DS_Store
+.idea
+.gitignore
+/lab2/.ipynb_checkpoints/lab2-checkpoint.ipynb
+/lab2/__pycache__/model.cpython-37.pyc
