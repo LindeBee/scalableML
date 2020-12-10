@@ -69,14 +69,14 @@ def load_data(data_path="lab2/dataF8K/captions.txt"):
 
 data = load_data()
 print("number of captions:", data.shape[0])
-data.head()
+# data.head()
 
 # %%
 
 # Add unique start word ">>>" (stop word = "." already present in captions)
 
 data["caption_with_start"] = ">>> " + data["caption"].str.lower()
-data.head()
+# data.head()
 
 # %%
 
@@ -94,77 +94,71 @@ for w in low_count_words:  # remove words with low threshold
 
 data["token_caption"] = tokenizer.texts_to_sequences(data["caption_with_start"])
 
-data.head()
-print(data["token_caption"][0])
+# data.head()
+# print(data["token_caption"][0])
 
 # %%
 captions = np.array(data["token_caption"])
-print(captions)
-print(captions[0])
+# print(captions)
+# print(captions[0])
 
 # %%
 
 # Prepare images through CNN model
+images = data["image"].to_numpy()
+def encode_images(images, length=None):
+    images_enc = []
+    if length is None:
+        length = len(images) - 1
+    for i in tqdm(range(length)):
+        if i == 0 or images[1] != images[i - 1]:
+            image_path = "lab2/dataF8k/Images/" + images[i]
+            img = tf.keras.preprocessing.image.load_img(image_path, target_size=(299, 299))
+            img = tf.keras.preprocessing.image.img_to_array(img)
+            x = img.reshape((1,) + img.shape)
+            x = tf.keras.applications.inception_v3.preprocess_input(x)
+            prediction = cnn4nw.predict(x)
+            prediction = prediction.reshape(2048)
+            images_enc.append(prediction)
+        else:
+            images_enc.append(images_enc[i - 1])
+    return images_enc
 
+
+#images_enc = encode_images(images)
 """
 	images_enc is of form:
 	[array([[0.12277617, 0.33294916, 0.75271696, ..., 0.30216402, 0.4028324 ]], dtype=float32) # Image 1 
 	array([[0.12277617, 0.33294916, 0.75271696, ..., 0.30216402, 0.4028324 ]], dtype=float32) # Image 1
 
 """
+#%%
 
-# images = data["image"].to_numpy()
-# images_enc = []
-# for i in tqdm(range(len(images) - 1)):
-#  if i == 0 or images[1] != images[i - 1]:
-#       image_path = "lab2/dataF8k/Images/" + images[i]
-#       img = tf.keras.preprocessing.image.load_img(image_path, target_size=(299, 299))
-#       img = tf.keras.preprocessing.image.img_to_array(img)
-#        x = img.reshape((1,) + img.shape)
-#       x = tf.keras.applications.inception_v3.preprocess_input(x)
-#       prediction = cnn4nw.predict(x)
-#      images_enc.append(prediction)
-#   else:
-#       images_enc.append(images_enc[i - 1])
+images_enc = np.load('lab2/images_encoded.npy')
+print(len(images_enc))
+print(images_enc[0])
+
 
 # %%
-## Test
-# Prepare images through CNN model
-images = data["image"].to_numpy()
-images_enc_test = []
-for i in tqdm(range(500)):
-    if i == 0 or images[1] != images[i - 1]:
-        image_path = "lab2/dataF8k/Images/" + images[i]
-        img = tf.keras.preprocessing.image.load_img(image_path, target_size=(299, 299))
-        img = tf.keras.preprocessing.image.img_to_array(img)
-        x = img.reshape((1,) + img.shape)
-        x = tf.keras.applications.inception_v3.preprocess_input(x)
-        prediction = cnn4nw.predict(x)
-        prediction = prediction.reshape(2048)
-        images_enc_test.append(prediction)
-    else:
-        images_enc_test.append(images_enc_test[i - 1])
+# captions_for_test = captions[:500]
 
-# %%
-captions_test = captions[:500]
-
-print(images_enc_test)  # 500 captions
+# print(images_enc_test)  # 500 captions
 # [array([[0.12277617, 0.33294916, 0.75271696, ..., 0.21939668, 0.30216402,
 #         0.4028324 ]], dtype=float32), array([[0.12277617, 0.33294916, 0.75271696, ..., 0.21939668, 0.30216402,
 #         0.4028324 ]], dtype=float32), array([[0.12277617, 0.33294916, 0.75271696, ..., 0.21939668, 0.30216402,...]
 
-print(images_enc_test[0].shape)  # (1, 2048)
-print(len(images_enc_test))  # 500
-#%%
-print(images_enc_test[0])
-#print(captions_test)  # 500 captions
+# print(images_enc_test[0].shape)  # (1, 2048)
+# print(len(images_enc_test))  # 500
+# %%
+# print(images_enc_test[0])
+# print(captions_test)  # 500 captions
 
 # %%
-## Test captions and images
-first_caption = captions_test[0]
-first_image = images_enc_test[0]
-print(first_caption)
-print(first_image)
+# Test captions and images
+# first_caption = captions_test[0]
+# first_image = images_enc_test[0]
+# print(first_caption)
+# print(first_image)
 
 
 # %%
@@ -186,7 +180,7 @@ def create_sequences(caption, image, max_length=40, vocab_size=3002):
     return X1, X2, y
 
 
-print(create_sequences(first_caption, first_image)[0])
+# print(create_sequences(first_caption, first_image)[0])
 
 
 # %%
@@ -195,7 +189,7 @@ print(create_sequences(first_caption, first_image)[0])
 # X1 shape : sum(caption in batch) [caption length - 1] rows x 2048 columns
 # X2 shape:  sum(caption in batch) [caption length - 1] rows x max_length columns
 # y shape: sum(caption in batch) [caption length - 1] rows x vocab_size columns
-def data_generator(captions, images, batch_size, max_length=40, vocab_size=3002, random_seed=17):
+def data_generator(captions, images, batch_size, max_length=40, vocab_size=3002, random_seed=10):
     random.seed(random_seed)
     print('here')
     # Setting random seed for reproducibility of results
@@ -227,11 +221,15 @@ def data_generator(captions, images, batch_size, max_length=40, vocab_size=3002,
 
 
 # %%
+batch_size = 32
+size_train = int(0.8 * len(captions))
+captions_train, captions_val = captions[:size_train], captions[size_train:]
+images_train, images_val = images[:size_train], images[size_train:]
+# %%
+generator_train = data_generator(captions_train, images_train, batch_size)
+generator_val = data_generator(captions_val, images_val, batch_size)
 
-generator_train = data_generator(captions_test[:400], images_enc_test[:400], 20)
-generator_val = data_generator(captions_test[400:], images_enc_test[400:], 20)
-
-#%%
-
+# %%
+steps_per_epoch = len(captions) / batch_size
 my_model = RNNModel()
-my_model.fit_generator(generator_train, epochs=20, validation_data=generator_val)
+my_model.fit_generator(generator_train, epochs=20, steps_per_epoch=steps_per_epoch, validation_data=generator_val)
