@@ -11,10 +11,14 @@ from tensorflow.keras.models import Model
 
 # %%
 
+# Set testing to False if you want to run through the whole dataset
+
+testing = True
+number_of_samples = 100
+# %%
 # Encoder Model = Pretrained InceptionV3 CNN model
 
 cnn_model = InceptionV3()
-
 cnn_model._layers.pop()  # remove last layer for our encoder (classification layer)
 cnn4nw = Model(inputs=cnn_model.inputs, outputs=cnn_model.layers[-1].output)
 
@@ -31,25 +35,25 @@ def RNNModel():
     max_len = 40  # maximum number of words used in a caption (it is actually 37)
     embedding_size = 512  # size of the embedding layer used as input for the LSTMs
     output_cnn_size = 2048  # size of the output vector of the CNN model InceptionV3
-    size = 600
+    dropout = 0.3
 
     # Pipeline 1 : Layers after the CNN output
     image_input = tf.keras.layers.Input(
         shape=(output_cnn_size,))  # an input layer which size is the output size of the cnn model
-    image_model_1 = tf.keras.layers.Dropout(0.3)(image_input)  # a dropout layer for optimization
+    image_model_1 = tf.keras.layers.Dropout(dropout)(image_input)  # a dropout layer for optimization
     image_model = tf.keras.layers.Dense(embedding_size, activation='relu')(
         image_model_1)  # A dense layer used for embedding the output vectors of the CNN model
 
     # Pipeline 2 : Layers after mapping words to one hot vectors
     caption_input = tf.keras.layers.Input(shape=(max_len,))
     caption_model_1 = tf.keras.layers.Embedding(vocab_size, embedding_size, mask_zero=True)(caption_input)
-    caption_model_2 = tf.keras.layers.Dropout(0.3)(caption_model_1)
-    caption_model = tf.keras.layers.LSTM(size)(caption_model_2)
+    caption_model_2 = tf.keras.layers.Dropout(dropout)(caption_model_1)
+    caption_model = tf.keras.layers.LSTM(embedding_size)(caption_model_2)
 
     # Merging the models and creating a softmax classifier
     final_model_1 = tf.keras.layers.concatenate([image_model, caption_model])
-    final_model_2 = tf.keras.layers.Dense(size, activation='relu')(final_model_1)
-    final_model = tf.keras.layers.Dense(vocab_size, activation='softmax')(final_model_2)
+    #final_model_2 = tf.keras.layers.Dense(embedding_size, activation='relu')(final_model_1)
+    final_model = tf.keras.layers.Dense(vocab_size, activation='softmax')(final_model_1)
 
     # Creating the model
     rnn_model = tf.keras.models.Model(inputs=[image_input, caption_input], outputs=final_model)
@@ -69,14 +73,14 @@ def load_data(data_path="lab2/dataF8K/captions.txt"):
 
 data = load_data()
 print("number of captions:", data.shape[0])
-# data.head()
+data.head()
 
 # %%
 
 # Add unique start word ">>>" (stop word = "." already present in captions)
 
 data["caption_with_start"] = ">>> " + data["caption"].str.lower()
-# data.head()
+data.head()
 
 # %%
 
@@ -94,18 +98,24 @@ for w in low_count_words:  # remove words with low threshold
 
 data["token_caption"] = tokenizer.texts_to_sequences(data["caption_with_start"])
 
-# data.head()
-# print(data["token_caption"][0])
+data.head()
+print(data["token_caption"][0])
 
 # %%
 captions = np.array(data["token_caption"])
-# print(captions)
-# print(captions[0])
+print(captions)
+print(captions[0])
 
+if testing:
+    captions = captions[:number_of_samples]
+
+print(len(captions))
 # %%
 
 # Prepare images through CNN model
 images = data["image"].to_numpy()
+
+
 def encode_images(images, length=None):
     images_enc = []
     if length is None:
@@ -122,23 +132,29 @@ def encode_images(images, length=None):
             images_enc.append(prediction)
         else:
             images_enc.append(images_enc[i - 1])
-    return images_enc
+    np.save('images_enc.npy', images_enc)
+    # return images_enc
 
 
-#images_enc = encode_images(images)
 """
 	images_enc is of form:
 	[array([[0.12277617, 0.33294916, 0.75271696, ..., 0.30216402, 0.4028324 ]], dtype=float32) # Image 1 
 	array([[0.12277617, 0.33294916, 0.75271696, ..., 0.30216402, 0.4028324 ]], dtype=float32) # Image 1
 
 """
-#%%
 
-images_enc = np.load('lab2/image_enc.npy')
+# %%
+images_enc = np.load('images_enc.npy')
 print(len(images_enc))
 print(images_enc[0])
 
+#if testing:
+  #  images_enc = encode_images(images, number_of_samples)
 
+#%%
+if testing:
+    images_enc = images_enc[:number_of_samples]
+print(len(images_enc))
 # %%
 # captions_for_test = captions[:500]
 
@@ -191,7 +207,6 @@ def create_sequences(caption, image, max_length=40, vocab_size=3002):
 # y shape: sum(caption in batch) [caption length - 1] rows x vocab_size columns
 def data_generator(captions, images, batch_size, max_length=40, vocab_size=3002, random_seed=10):
     random.seed(random_seed)
-    print('here')
     # Setting random seed for reproducibility of results
     index_list = np.arange(len(captions))
     _count = 0
@@ -221,15 +236,52 @@ def data_generator(captions, images, batch_size, max_length=40, vocab_size=3002,
 
 
 # %%
-batch_size = 32
+
+# Define training parameters and split inputs into train,val
+batch_size = 64
+num_of_epochs = 20
+
+if testing :
+    batch_size = 10
+    num_of_epochs = 5
+
 size_train = int(0.8 * len(captions))
+size_val = len(captions) - size_train
+
+steps_train = size_train // batch_size
+if size_train % batch_size != 0:
+    steps_train = steps_train + 1
+
+steps_val = size_val // batch_size
+if size_val % batch_size != 0:
+    steps_val = steps_val + 1
+
 captions_train, captions_val = captions[:size_train], captions[size_train:]
-images_train, images_val = images[:size_train], images[size_train:]
+images_train, images_val = images_enc[:size_train], images_enc[size_train:]
+
 # %%
+
+# Create generators with inputs
+
+generator = data_generator(captions, images_enc, batch_size)
 generator_train = data_generator(captions_train, images_train, batch_size)
 generator_val = data_generator(captions_val, images_val, batch_size)
 
 # %%
-steps_per_epoch = len(captions) / batch_size
-my_model = RNNModel()
-my_model.fit_generator(generator_train, epochs=20, steps_per_epoch=steps_per_epoch, validation_data=generator_val)
+# Train the model
+lina_model = RNNModel()
+
+history = lina_model.fit(generator_train,
+                         epochs=num_of_epochs,
+                         steps_per_epoch=steps_train,
+                         validation_data=generator_val,
+                         validation_steps=steps_val
+                         )
+
+lina_model.save('lina_model')
+# %%
+train_loss = history.history['loss']
+val_loss = history.history['val_loss']
+to_plot = pd.DataFrame(history.history)
+to_plot.plot()
+plt.show()
